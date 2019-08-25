@@ -1,0 +1,187 @@
+---
+title: "PA1_template.Rmd"
+author: "Ritesh Raj"
+date: "25 August 2019"
+output: html_document
+References : report Wrirting In R By Roger Peng
+
+---
+---
+C:\Users\RITESH\AppData\Local\Temp\Rtmp0ItrxP\downloaded_packages
+title: "Peer Graded Assignment 1- Reproducible Research"
+---
+
+##Things to be done
+1.Code for reading in the dataset and/or processing the data
+2.Histogram of the total number of steps taken each day
+3.Mean and median number of steps taken each day
+4.Time series plot of the average number of steps taken
+5.The 5-minute interval that, on average, contains the maximum number of steps
+6.Code to describe and show a strategy for imputing missing data
+7.Histogram of the total number of steps taken each day after missing values are imputed
+8.Panel plot comparing the average number of steps taken per 5-minute interval across weekdays and weekends
+9.All of the R code needed to reproduce the results (numbers, plots, etc.) in the report
+
+##Step 1 Code for reading in the dataset and/or processing the data
+
+
+```{r, echo = TRUE}
+setwd("D:/R Directory/R directory")
+activity<-read.csv("D:/SQL ,C# Programs/Coursera DataSets/activity.csv")
+```
+
+
+Exploring the basics of this data
+```{r}
+dim(activity)
+names(activity)
+head(activity)
+str(activity)
+#total number of missing data
+sum(is.na(activity$steps))/dim(activity)[[1]]
+#transforming the date column into date format using lubridate
+library(lubridate)
+activity$date<-ymd(activity$date)
+length(unique(activity$date))
+```
+
+##Step 2 Histogram of the total number of steps taken each day
+
+```{r, echo = TRUE}
+library(ggplot2)
+DfQ2<-data.frame(tapply(activity$steps,activity$date,sum,na.rm=TRUE))
+DfQ2$date<-rownames(DfQ2)
+rownames(DfQ2)<-NULL
+names(DfQ2)[[1]]<-"Total Steps"
+png("plot1.png")
+#Total Steps by date bar chart
+ggplot(DfQ2,aes(y=DfQ2$`Total Steps`,x=DfQ2$date))+geom_bar(stat="identity") + ylab("Total Steps")+xlab("Date")+ggtitle("Total Steps by date")
+dev.off()
+ggplot(DfQ2,aes(y=DfQ2$`Total Steps`,x=DfQ2$date))+geom_bar(stat="identity") + ylab("Total Steps")+xlab("Date")+ggtitle("Total Steps by date")
+#Histogram of total steps
+qplot(DfQ2$`Total Steps`,geom="histogram",xlab="Total Steps",ylab="Counts",main="Total Steps Historgram")
+png("plot1.1.png")
+qplot(DfQ2$`Total Steps`,geom="histogram",xlab="Total Steps",ylab="Counts",main="Total Steps Historgram")
+dev.off()
+
+##Step 3  Mean and median number of steps taken each day
+
+```{r, echo = TRUE}
+library(dplyr)
+DfQ3<-data.frame(round(tapply(activity$steps,activity$date,mean,na.rm=TRUE),2))
+DfQ3$date<-rownames(DfQ3)
+rownames(DfQ3)<-NULL
+names(DfQ3)[[1]]<-"Mean Steps"
+temp<-activity%>%select(date,steps) %>% group_by(date) %>% summarise(median(steps))
+names(temp)[[2]]<-"Median Steps"
+DfQ3$median<-temp$`Median Steps`
+DfQ3<-DfQ3 %>% select(date,`Mean Steps`,median)
+```
+
+##Step 4 Time series plot of the average number of steps taken
+
+```{r, echo = TRUE}
+DfQ4<-DfQ3
+DfQ4$date<-as.Date(DfQ4$date,format="%Y-%m-%d")
+ggplot(DfQ4,aes(x=DfQ4$date,y=DfQ4$`Mean Steps`))+geom_bar(stat="identity")+scale_x_date()+ylab("Mean Steps by Every day")+xlab("Date")+ggtitle("Mean Steps by Date")
+png("plot4.png")
+ggplot(DfQ4,aes(x=DfQ4$date,y=DfQ4$`Mean Steps`))+geom_bar(stat="identity")+scale_x_date()+ylab("Mean Steps by Every day")+xlab("Date")+ggtitle("Mean Steps by Date")
+dev.off()
+
+##Step 5
+##The 5-minute interval that, on average, contains the maximum number of steps
+
+```{r, echo = TRUE}
+#This is assuming that the words on average means averaging steps by date and interval
+activity$interval<-factor(activity$interval)
+TableQ5<-aggregate(data=activity,steps~date+interval,FUN="mean")
+TableQ5<-aggregate(data=TableQ5,steps~interval,FUN="max")
+```
+
+##Step 6 Code to describe and show a strategy for imputing missing data
+
+The common strategies for imputing missing data are 1. Constant value imputations 2. Regression model value imputations 3. Mean/mode value substitutions
+```{r, echo = TRUE}
+DfQ6<-activity
+DfQ6$Missing<-is.na(DfQ6$steps)
+DfQ6<-aggregate(data=DfQ6,Missing~date+interval,FUN="sum")
+DfQ6A<-data.frame(tapply(DfQ6$Missing,DfQ6$date,sum))
+DfQ6A$date<-rownames(DfQ6A)
+rownames(DfQ6A)<-NULL
+names(DfQ6A)<-c("Missing","date")
+DfQ6A$date<-as.Date(DfQ6A$date,format="%Y-%m-%d")
+DfQ6B<-data.frame(tapply(DfQ6$Missing,DfQ6$interval,sum))
+DfQ6B$date<-rownames(DfQ6B)
+rownames(DfQ6B)<-NULL
+names(DfQ6B)<-c("Missing","Interval")
+par(mfrow=c(1,2))
+plot(y=DfQ6A$Missing,x=DfQ6A$date,main="Missing Value Distribution by Date")
+plot(y=DfQ6B$Missing,x=DfQ6B$Interval,main="Missing Value Distribution by Interval")
+table(activity$date)
+```
+
+we can see that for every interval, there are 8 values as NA. Date has 288 missing values In total there are 8 dates that have missing value.
+
+```{r, echo = TRUE}
+#Dates that have missing values 
+library(lubridate)
+DfQ6C<-as.data.frame(DfQ6A) %>% select(date,Missing) %>% arrange(desc(Missing))
+DfQ6C<-DfQ6C[which(DfQ6C$Missing!=0),]
+DfQ6C$Weekday<-wday(DfQ6C$date,label=TRUE)
+DfQ6D<-activity
+DfQ6D$weekday<-wday(DfQ6D$date,label=TRUE)
+#Finding the mean of steps every monday, and every interval
+DfQ6E<-aggregate(data=DfQ6D,steps~interval+weekday,FUN="mean",na.rm=TRUE)
+#Merge the pre-imputation table DfQ6D table with the average table DfQ6E
+DfQ6F<-merge(x=DfQ6D,y=DfQ6E,by.x=c("interval","weekday"),by.y=c("interval","weekday"),all.x=TRUE)
+#Conditionally replacing the steps.x column NA value with the values from steps.y column value 
+DfQ6F$Steps.Updated<-0
+for (i in 1:dim(DfQ6F)[[1]]){
+if(is.na(DfQ6F[i,3])){DfQ6F[i,6]=DfQ6F[i,5]}
+else {DfQ6F[i,6]=DfQ6F[i,3]}
+}
+#Now simplify the imputed analytical data frame
+DfQ6F <-DfQ6F  %>% select(date,weekday,interval,Steps.Updated)
+names(DfQ6F)[[4]]<-"Steps"
+
+## Step 7 Histogram of the total number of steps taken each day after missing values are imputed
+
+
+```{r, echo = TRUE}
+png("plot7.png")
+qplot(DfQ6F$Steps,geom="histogram",main="Histogram Total steps taken after imputation",xlab="Steps",ylab="Count")
+dev.off()
+qplot(DfQ6F$Steps,geom="histogram",main="Histogram Total steps taken after imputation",xlab="Steps",ylab="Count")
+```
+
+
+
+## Step 8
+Panel plot comparing the average number of steps taken per 5-minute interval across weekdays and weekends
+
+```{r, echo = TRUE}
+DfQ8<-DfQ6F
+levels(DfQ8$weekday)<-c(1,2,3,4,5,6,7)
+DfQ8$WDWE<-DfQ8$weekday %in% c(1,2,3,4,5)
+DfQ8.1<-aggregate(data=DfQ8,Steps~interval+WDWE,mean,na.rm=TRUE)
+DfQ8.1$WDWE<-as.factor(DfQ8.1$WDWE)
+levels(DfQ8.1$WDWE)<-c("Weekend","Weekday")
+png("plot8.png")
+ggplot(data=DfQ8.1,aes(y=Steps,x=interval,group=1,color=WDWE))+geom_line() +scale_x_discrete(breaks = seq(0, 2500, by = 300))+ylab("Mean Steps")+xlab("Intervals")+ggtitle("Mean steps across intervals by Weekend and Weekday")
+dev.off()
+ggplot(data=DfQ8.1,aes(y=Steps,x=interval,group=1,color=WDWE))+geom_line() +scale_x_discrete(breaks = seq(0, 2500, by = 300))+ylab("Mean Steps")+xlab("Intervals")+ggtitle("Mean steps across intervals by Weekend and Weekday")
+#Producing the panel plot
+DfQ8.1$interval<-as.numeric(as.character(DfQ8.1$interval))
+library(lattice)
+xyplot(data=DfQ8.1,Steps~interval|WDWE, grid = TRUE, type = c("p", "smooth"), lwd = 4,panel = panel.smoothScatter)
+library(hexbin)
+hexbinplot(data=DfQ8.1,Steps~interval|WDWE, aspect = 1, bins=50)
+png("plott8.1.png")
+xyplot(data=DfQ8.1,Steps~interval|WDWE, grid = TRUE, type = c("p", "smooth"), lwd = 4,panel = panel.smoothScatter)
+dev.off()
+png("plot8.2.png")
+hexbinplot(data=DfQ8.1,Steps~interval|WDWE, aspect = 1, bins=50)
+dev.off()
+```
+
+
